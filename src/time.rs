@@ -1,5 +1,46 @@
 use core::cell;
 
+use fugit::{ Instant, Duration };
+
+type TickInstant = Instant<u64, 1, 1000>;
+type TickDuration = Duration<u64, 1, 1000>;
+
+
+pub struct Timer<'a> {
+    end_time: TickInstant,
+    ticker: &'a Ticker
+}
+
+impl<'a> Timer<'a> {
+    //fn new(duration: TickDuration, ticker: &'a Ticker) -> Self {
+    pub fn new(duration: TickDuration, ticker: &'a Ticker) -> Self {
+        Timer {
+            ticker,
+            end_time: ticker.now() + duration
+        }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.ticker.now() >= self.end_time
+    }
+}
+
+pub struct Ticker {
+}
+
+impl Ticker {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    //fn now(&self) -> TickInstant {
+    pub fn now(&self) -> TickInstant {
+        TickInstant::from_ticks(Clock::get_millis())
+    }
+}
+
+
+
 static MILLIS: avr_device::interrupt::Mutex<cell::Cell<u64>> = avr_device::interrupt::Mutex::new(cell::Cell::new(0));
 
 #[avr_device::interrupt(atmega328p)]
