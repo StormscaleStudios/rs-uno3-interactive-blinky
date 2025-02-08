@@ -3,7 +3,7 @@ use core::cell;
 use fugit::{ Instant, Duration };
 
 type TickInstant = Instant<u64, 1, 1000>;
-type TickDuration = Duration<u64, 1, 1000>;
+pub type TickDuration = Duration<u64, 1, 1000>;
 
 
 pub struct Timer<'a> {

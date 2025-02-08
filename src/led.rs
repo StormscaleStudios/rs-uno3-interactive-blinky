@@ -1,4 +1,6 @@
-use crate::time::{Timer, Ticker};
+use crate::button::ButtonDirection;
+use crate::channel::Reciever;
+use crate::time::{Ticker, Timer};
 
 use arduino_hal::{hal::port::Dynamic, port::{mode::Output, Pin}};
 use fugit::Duration;
@@ -13,21 +15,29 @@ pub enum LedState<'a> {
 pub struct LedTask<'a> {
     array: LedArray,
     ticker: &'a Ticker,
-    state: LedState<'a>
+    state: LedState<'a>,
+    channel: Reciever<'a, ButtonDirection>
 }
 
 impl<'a> LedTask<'a> {
-    pub fn new(ticker: &'a Ticker, array: LedArray) -> Self {
+    pub fn new(ticker: &'a Ticker, array: LedArray, channel: Reciever<'a, ButtonDirection>) -> Self {
         LedTask {
             array,
             ticker,
-            state: LedState::Toggle
+            state: LedState::Toggle,
+            channel
         }
     }
 
     pub fn poll(&mut self) -> () {
         match &self.state {
             LedState::Toggle => {
+                match self.channel.receive() {
+                    Some(direction) => {
+                        self.array.switch(direction);
+                    }
+                    None => {}
+                }
                 self.array.walk();
                 self.state = LedState::Wait(
                     Timer::new(TickDuration::from_ticks(250), &self.ticker)
@@ -43,37 +53,36 @@ impl<'a> LedTask<'a> {
 
 }
 
-
 pub struct LedArray {
-    _array: [Pin<Output, Dynamic>; 4],
-    _active: i8,
-    _clockwise: bool
+    array: [Pin<Output, Dynamic>; 4],
+    active: i8,
+    direction: ButtonDirection
 }
 
 impl LedArray {
     pub fn new(mut array: [Pin<Output, Dynamic>; 4]) -> Self {
-        array[0].toggle();
-        Self { _array: array, _active: 0, _clockwise: true }
+        array[0].set_high();
+        Self { array , active: 0, direction: ButtonDirection::Clockwise }
     }
 
     fn _length(&self) -> usize {
-        self._array.len()
+        self.array.len()
     }
 
     pub fn walk(&mut self) -> () {
-        self._array[self._active as usize].toggle();
-        let modifier: i8 = match self._clockwise {
-            true => 1,
-            false => -1
+        self.array[self.active as usize].toggle();
+        let modifier: i8 = match self.direction {
+            ButtonDirection::Clockwise => 1,
+            ButtonDirection::CounterClockwise => -1
         };
 
         // scuffed custom modulo operator because Rust only has remainder, which operates in 
         // reverse for negative numbers
-        self._active = (((self._active + modifier) % 4) + 4) % 4;
-        self._array[self._active as usize].toggle();
+        self.active = (((self.active + modifier) % 4) + 4) % 4;
+        self.array[self.active as usize].toggle();
     }
 
-    pub fn switch(&mut self) -> () {
-        self._clockwise = !self._clockwise;
+    pub fn switch(&mut self, direction: ButtonDirection) -> () {
+        self.direction = direction
     }
 }

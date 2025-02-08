@@ -3,10 +3,14 @@
 #![feature(abi_avr_interrupt)]
 
 mod time;
-use crate::time::{Clock, TimerCounter, Ticker};
-
 mod led;
+mod button;
+mod channel;
+
+use crate::time::{Clock, TimerCounter, Ticker};
 use crate::led::{LedArray, LedTask};
+use crate::button::{ButtonTask, ButtonDirection};
+use crate::channel::Channel;
 
 use panic_halt as _;
 
@@ -21,7 +25,6 @@ fn main() -> ! {
     Clock::init(TimerCounter::Tc0(dp.TC0));
     let ticker = Ticker::new();
 
-    let _button = pins.d2.into_pull_up_input();
 
     let array = [
         pins.d3.into_output().downgrade(),
@@ -30,9 +33,22 @@ fn main() -> ! {
         pins.d6.into_output().downgrade()
     ];
     let led_array = LedArray::new(array);
-    let mut led_task = LedTask::new(&ticker, led_array);
+
+    let channel: Channel<ButtonDirection> = Channel::new();
+
+    let mut button_task = ButtonTask::new(
+        pins.d2.into_pull_up_input().downgrade(), 
+        &ticker, 
+        channel.get_sender()
+    );
+    let mut led_task = LedTask::new(
+        &ticker, 
+        led_array,
+        channel.get_reciever()
+    );
 
     loop {
+        button_task.poll();
         led_task.poll();
     }
 }
